@@ -247,6 +247,69 @@
     if (usaSenha() && !recuperar) cartaoCriada(""); else cartaoForm(true);
   }
 
+  function abas(atual) {
+    var itens = [
+      ["inicio", "Início", "◌"],
+      ["flow", "Life Flow", "∿"],
+      ["body", "Life Body", "◍"],
+      ["perfil", "Perfil", "○"]
+    ];
+    return (
+      '<nav class="abas" aria-label="Navegação">' +
+      itens.map(function (i) {
+        return '<a href="#/' + i[0] + '"' + (i[0] === atual ? ' aria-current="page"' : "") + '><span class="ic" aria-hidden="true">' + i[2] + "</span>" + i[1] + "</a>";
+      }).join("") +
+      "</nav>"
+    );
+  }
+
+  function telaEmBreve(aba, titulo, texto) {
+    app.innerHTML =
+      '<main class="tela">' + cabecalhoMarca() +
+      '<div class="card"><div class="rotulo">Em breve</div><h2>' + esc(titulo) + "</h2>" +
+      '<p class="suave" style="margin-top:8px">' + esc(texto) + "</p></div>" +
+      '<button class="sair" id="sair">Sair da conta</button></main>' + abas(aba);
+    document.getElementById("sair").addEventListener("click", sair);
+  }
+
+  /* ---------- dados ---------- */
+  async function carregarInicio(user) {
+    var out = { perfil: null, acesso: null, ritual: null, passo: null, diasComRegistro: 0, humor: null, semana: 1, diaDaSemana: 1 };
+
+    var rp = await sb.from("perfis").select("nome,visibilidade").eq("id", user.id).maybeSingle();
+    out.perfil = rp.data;
+
+    var ra = await sb.from("acessos_flow").select("macrofase_id,tipo,inicio_em").eq("status", "ativo").order("inicio_em", { ascending: true }).limit(1).maybeSingle();
+    out.acesso = ra.data;
+
+    var hoje = hojeISO();
+    var rh = await sb.from("corpo_registros").select("dia_nivel").eq("data", hoje).maybeSingle();
+    out.humor = rh.data ? rh.data.dia_nivel : null;
+
+    if (!out.acesso) return out;
+
+    var inicio = dataLocalISO(out.acesso.inicio_em);
+    var dias = Math.max(0, diasEntre(inicio, hoje));
+    out.semana = Math.floor(dias / 7) + 1;
+    out.diaDaSemana = (dias % 7) + 1;
+
+    // Ritual da semana: n-esima semana da macrofase
+    var rr = await sb.from("rituals_semanas")
+      .select("numero,palavra_tema,frase")
+      .eq("macrofase_id", out.acesso.macrofase_id)
+      .order("numero", { ascending: true })
+      .limit(out.semana);
+    if (rr.data && rr.data.length) out.ritual = rr.data[rr.data.length - 1];
+
+    if (out.ritual) {
+      var rt = await sb.from("flow_tarefas").select("titulo,tipo").eq("semana_numero", out.ritual.numero).eq("dia", out.diaDaSemana).maybeSingle();
+      out.passo = rt.data;
+      var rd = await sb.rpc("dias_com_registro", { p_semana: out.ritual.numero });
+      out.diasComRegistro = rd.data || 0;
+    }
+    return out;
+  }
+
   /* ---------- Escolha do Flow gratuito ---------- */
   // Palavras-tema das 6 primeiras semanas de cada foco (mesmo conteudo dos Rituals).
   var FOCOS = [
