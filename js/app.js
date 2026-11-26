@@ -197,11 +197,38 @@
     return out;
   }
 
+  /* ---------- Boas-vindas: primeiro nome ---------- */
+  function telaNome(user) {
+    app.innerHTML =
+      '<main class="centro">' + cabecalhoMarca() +
+      '<h1 style="font-size:30px;margin-top:34px;text-align:center">Que bom ter você aqui.</h1>' +
+      '<p class="suave" style="text-align:center;margin-top:12px">Como você gosta de ser chamada?</p>' +
+      '<form id="f-nome" novalidate>' +
+      '<label for="nome">Seu primeiro nome</label>' +
+      '<input id="nome" type="text" autocomplete="given-name" maxlength="40" required>' +
+      '<button class="btn" type="submit">Continuar</button>' +
+      '<p id="msg" class="msg" role="status"></p>' +
+      '</form></main>';
+    document.getElementById("f-nome").addEventListener("submit", async function (ev) {
+      ev.preventDefault();
+      var msg = document.getElementById("msg");
+      var botao = ev.target.querySelector("button");
+      var nome = document.getElementById("nome").value.trim();
+      if (nome.length < 2) { msg.className = "msg erro"; msg.textContent = "Digite o seu primeiro nome."; return; }
+      botao.disabled = true;
+      var r = await sb.from("perfis").update({ nome: nome }).eq("id", user.id);
+      botao.disabled = false;
+      if (r.error) { msg.className = "msg erro"; msg.textContent = "Não consegui guardar agora. Tente de novo."; return; }
+      telaInicio(user);
+    });
+  }
+
   /* ---------- Inicio ---------- */
   async function telaInicio(user) {
     telaCarregando();
     var d = await carregarInicio(user);
     var primeiroNome = d.perfil && d.perfil.nome ? d.perfil.nome.split(" ")[0] : "";
+    if (!primeiroNome) { return telaNome(user); }
 
     var humores = [["1", "😔"], ["2", "😕"], ["3", "😐"], ["4", "🙂"], ["5", "😊"]];
 
