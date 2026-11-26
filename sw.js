@@ -1,6 +1,6 @@
 // Service worker simples: guarda a "casca" do app para abrir rapido.
 // Dados do Supabase nunca ficam em cache.
-const VERSAO = "myndra-v2";
+const VERSAO = "myndra-v3";
 const CASCA = [
   "./",
   "index.html",
@@ -30,7 +30,7 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   // rede primeiro, cache como reserva (assim atualizacoes chegam logo)
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" })
       .then((r) => {
         const copia = r.clone();
         caches.open(VERSAO).then((c) => c.put(e.request, copia));
