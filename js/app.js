@@ -46,7 +46,7 @@
   }
 
   function cabecalhoMarca() {
-    return '<div class="marca"><div class="logo">MyndraLife</div><div class="lema">Rotina com Alma</div></div>';
+    return '<div class="marca"><img class="logo-img" src="icons/logo-myndra.png" alt="Myndra" width="190"><div class="lema">Rotina com Alma</div></div>';
   }
 
   function telaLogin(aviso) {

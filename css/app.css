@@ -28,6 +28,7 @@ button { font: inherit; cursor: pointer; }
 /* marca */
 .marca { text-align: center; }
 .marca .logo { font-family: var(--serif); font-size: 34px; letter-spacing: 0.04em; color: var(--floresta); }
+.marca .logo-img { width: 190px; height: auto; display: inline-block; }
 .marca .lema { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dourado); margin-top: 4px; }
 
 /* cartoes */

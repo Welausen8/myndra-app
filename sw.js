@@ -1,6 +1,6 @@
 // Service worker simples: guarda a "casca" do app para abrir rapido.
 // Dados do Supabase nunca ficam em cache.
-const VERSAO = "myndra-v1";
+const VERSAO = "myndra-v2";
 const CASCA = [
   "./",
   "index.html",
@@ -9,7 +9,8 @@ const CASCA = [
   "js/app.js",
   "js/vendor/supabase.js",
   "manifest.webmanifest",
-  "icons/icon.svg"
+  "icons/icon-192.png",
+  "icons/logo-myndra.png"
 ];
 
 self.addEventListener("install", (e) => {
