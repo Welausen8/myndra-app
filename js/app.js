@@ -49,17 +49,31 @@
     return '<div class="marca"><img class="logo-img" src="icons/logo-myndra.png" alt="Myndra" width="190"><div class="lema">Rotina com Alma</div></div>';
   }
 
-  function telaLogin(aviso) {
+  function lembrarSenha(sim) {
+    try { if (sim) localStorage.setItem("myndra_usa_senha", "1"); else localStorage.removeItem("myndra_usa_senha"); } catch (e) {}
+  }
+  function usaSenha() {
+    try { return localStorage.getItem("myndra_usa_senha") === "1"; } catch (e) { return false; }
+  }
+
+  function telaLogin(aviso, modo) {
+    modo = modo || (usaSenha() ? "senha" : "codigo");
+    var senha = modo === "senha";
     app.innerHTML =
       '<main class="centro">' +
       cabecalhoMarca() +
       '<h1 style="font-size:30px;margin-top:34px;text-align:center">Todas estamos em movimento, cada uma na sua semana.</h1>' +
-      '<p id="intro" class="suave" style="text-align:center;margin-top:12px">Digite seu e-mail e enviamos um código para você entrar. Sem senha.</p>' +
+      '<p id="intro" class="suave" style="text-align:center;margin-top:12px">' +
+      (senha ? "Entre com o seu e-mail e a sua senha." : "Digite seu e-mail e enviamos um código para você entrar. Sem senha.") + "</p>" +
       '<form id="f-login" novalidate>' +
       '<label for="email">Seu e-mail</label>' +
-      '<input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" required>' +
-      '<button class="btn" type="submit">Enviar código de acesso</button>' +
+      '<input id="email" type="email" inputmode="email" autocomplete="username" placeholder="voce@exemplo.com" required>' +
+      (senha
+        ? '<label for="senha">Sua senha</label><input id="senha" type="password" autocomplete="current-password" required>'
+        : "") +
+      '<button class="btn" type="submit">' + (senha ? "Entrar" : "Enviar código de acesso") + "</button>" +
       '<p id="msg" class="msg' + (aviso ? " erro" : "") + '" role="status">' + esc(aviso || "") + "</p>" +
+      '<button class="sair" type="button" id="trocar">' + (senha ? "Prefiro receber um código por e-mail" : "Entrar com e-mail e senha") + "</button>" +
       "</form>" +
       '<form id="f-codigo" novalidate hidden>' +
       '<label for="codigo">Código de 6 números</label>' +
@@ -74,17 +88,38 @@
     var fCodigo = document.getElementById("f-codigo");
     var emailEnviado = "";
 
+    document.getElementById("trocar").addEventListener("click", function () {
+      telaLogin("", senha ? "codigo" : "senha");
+    });
+
     fLogin.addEventListener("submit", async function (ev) {
       ev.preventDefault();
       var campo = document.getElementById("email");
       var msg = document.getElementById("msg");
-      var botao = fLogin.querySelector("button");
+      var botao = fLogin.querySelector("button.btn");
       var email = campo.value.trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         msg.className = "msg erro";
         msg.textContent = "Confira o e-mail digitado.";
         return;
       }
+
+      if (senha) {
+        var pw = document.getElementById("senha").value;
+        if (!pw) { msg.className = "msg erro"; msg.textContent = "Digite a sua senha."; return; }
+        botao.disabled = true;
+        msg.className = "msg";
+        msg.textContent = "Entrando...";
+        var rs = await sb.auth.signInWithPassword({ email: email, password: pw });
+        botao.disabled = false;
+        if (rs.error) {
+          msg.className = "msg erro";
+          msg.textContent = "E-mail ou senha não conferem. Se preferir, receba um código por e-mail.";
+        }
+        // se deu certo, onAuthStateChange abre o Inicio
+        return;
+      }
+
       botao.disabled = true;
       msg.className = "msg";
       msg.textContent = "Enviando...";
@@ -126,11 +161,51 @@
         msg.className = "msg erro";
         msg.textContent = "Esse código não funcionou. Confira os números ou peça um novo.";
       }
-      // se deu certo, onAuthStateChange abre o Inicio
     });
 
     document.getElementById("outro").addEventListener("click", function () {
-      telaLogin();
+      telaLogin("", modo);
+    });
+  }
+
+  /* ---------- Perfil (por enquanto: conta e senha) ---------- */
+  function telaPerfil(user) {
+    app.innerHTML =
+      '<main class="tela">' + cabecalhoMarca() +
+      '<div class="card"><div class="rotulo">Sua conta</div><h2>' + esc(user.email || "") + "</h2>" +
+      '<p class="suave" style="margin-top:6px">Mais opções de perfil e de privacidade chegam em breve.</p></div>' +
+      '<div class="card"><div class="rotulo">Senha</div><h2>Entrar sem pedir código</h2>' +
+      '<p class="suave" style="margin-top:6px">Crie uma senha e o seu celular pode guardá-la. Você continua podendo entrar por código, se preferir.</p>' +
+      '<form id="f-senha" novalidate>' +
+      '<input type="text" autocomplete="username" value="' + esc(user.email || "") + '" hidden>' +
+      '<label for="nova">Nova senha (mínimo 8 caracteres)</label>' +
+      '<input id="nova" type="password" autocomplete="new-password" minlength="8" required>' +
+      '<button class="btn" type="submit">Salvar senha</button>' +
+      '<p id="msg" class="msg" role="status"></p></form></div>' +
+      '<button class="sair" id="sair">Sair da conta</button></main>' + abas("perfil");
+    document.getElementById("sair").addEventListener("click", sair);
+    document.getElementById("f-senha").addEventListener("submit", async function (ev) {
+      ev.preventDefault();
+      var msg = document.getElementById("msg");
+      var botao = ev.target.querySelector("button.btn");
+      var pw = document.getElementById("nova").value;
+      if (pw.length < 8) { msg.className = "msg erro"; msg.textContent = "Use pelo menos 8 caracteres."; return; }
+      botao.disabled = true;
+      msg.className = "msg";
+      msg.textContent = "Salvando...";
+      var r = await sb.auth.updateUser({ password: pw });
+      botao.disabled = false;
+      if (r.error) {
+        msg.className = "msg erro";
+        msg.textContent = /different|same/i.test(r.error.message || "")
+          ? "Essa já é a sua senha atual."
+          : "Não consegui salvar agora. Tente uma senha diferente ou de novo em instantes.";
+        return;
+      }
+      lembrarSenha(true);
+      document.getElementById("nova").value = "";
+      msg.className = "msg ok";
+      msg.textContent = "Senha salva. Da próxima vez, entre com e-mail e senha.";
     });
   }
 
@@ -395,7 +470,7 @@
     if (r === "escolher") return telaEscolherFlow(usuario);
     if (r === "flow") return telaEmBreve("flow", "Life Flow", "Aqui ficam as 7 tarefas da sua semana, uma por dia.");
     if (r === "body") return telaEmBreve("body", "Life Body", "Seu espaço para observar corpo, humor e ciclo. Só você vê.");
-    if (r === "perfil") return telaEmBreve("perfil", "Perfil", "Seus dados e o que fica visível para as outras mulheres.");
+    if (r === "perfil") return telaPerfil(usuario);
     return telaInicio(usuario);
   }
 
