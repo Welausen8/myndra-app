@@ -54,20 +54,31 @@
       '<main class="centro">' +
       cabecalhoMarca() +
       '<h1 style="font-size:30px;margin-top:34px;text-align:center">Todas estamos em movimento, cada uma na sua semana.</h1>' +
-      '<p class="suave" style="text-align:center;margin-top:12px">Digite seu e-mail e enviamos um link para você entrar. Sem senha.</p>' +
+      '<p id="intro" class="suave" style="text-align:center;margin-top:12px">Digite seu e-mail e enviamos um código para você entrar. Sem senha.</p>' +
       '<form id="f-login" novalidate>' +
       '<label for="email">Seu e-mail</label>' +
       '<input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" required>' +
-      '<button class="btn" type="submit">Enviar link de acesso</button>' +
+      '<button class="btn" type="submit">Enviar código de acesso</button>' +
       '<p id="msg" class="msg' + (aviso ? " erro" : "") + '" role="status">' + esc(aviso || "") + "</p>" +
+      "</form>" +
+      '<form id="f-codigo" novalidate hidden>' +
+      '<label for="codigo">Código de 6 números</label>' +
+      '<input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" style="letter-spacing:.4em;text-align:center;font-size:22px">' +
+      '<button class="btn" type="submit">Entrar</button>' +
+      '<p id="msg2" class="msg" role="status"></p>' +
+      '<button class="sair" type="button" id="outro">Usar outro e-mail</button>' +
       "</form>" +
       "</main>";
 
-    document.getElementById("f-login").addEventListener("submit", async function (ev) {
+    var fLogin = document.getElementById("f-login");
+    var fCodigo = document.getElementById("f-codigo");
+    var emailEnviado = "";
+
+    fLogin.addEventListener("submit", async function (ev) {
       ev.preventDefault();
       var campo = document.getElementById("email");
       var msg = document.getElementById("msg");
-      var botao = ev.target.querySelector("button");
+      var botao = fLogin.querySelector("button");
       var email = campo.value.trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         msg.className = "msg erro";
@@ -84,11 +95,42 @@
       botao.disabled = false;
       if (r.error) {
         msg.className = "msg erro";
-        msg.textContent = "Não consegui enviar agora. Tente de novo em instantes.";
+        msg.textContent = (r.error.status === 429 || /rate/i.test(r.error.code || r.error.message || ""))
+          ? "Já enviamos alguns códigos. Aguarde um pouco e tente de novo."
+          : "Não consegui enviar agora. Tente de novo em instantes.";
         return;
       }
-      msg.className = "msg ok";
-      msg.textContent = "Pronto. Abra seu e-mail e toque no link para entrar. Pode levar um minutinho, e vale olhar também o spam.";
+      emailEnviado = email;
+      fLogin.hidden = true;
+      fCodigo.hidden = false;
+      document.getElementById("intro").textContent = "Enviamos um código para " + email + ". Digite os 6 números abaixo. Vale olhar também o spam.";
+      document.getElementById("codigo").focus();
+    });
+
+    fCodigo.addEventListener("submit", async function (ev) {
+      ev.preventDefault();
+      var msg = document.getElementById("msg2");
+      var botao = fCodigo.querySelector("button.btn");
+      var codigo = document.getElementById("codigo").value.replace(/\D/g, "");
+      if (codigo.length !== 6) {
+        msg.className = "msg erro";
+        msg.textContent = "O código tem 6 números.";
+        return;
+      }
+      botao.disabled = true;
+      msg.className = "msg";
+      msg.textContent = "Entrando...";
+      var r = await sb.auth.verifyOtp({ email: emailEnviado, token: codigo, type: "email" });
+      botao.disabled = false;
+      if (r.error) {
+        msg.className = "msg erro";
+        msg.textContent = "Esse código não funcionou. Confira os números ou peça um novo.";
+      }
+      // se deu certo, onAuthStateChange abre o Inicio
+    });
+
+    document.getElementById("outro").addEventListener("click", function () {
+      telaLogin();
     });
   }
 
