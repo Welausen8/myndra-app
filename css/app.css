@@ -29,7 +29,7 @@ button { font: inherit; cursor: pointer; }
 .marca { text-align: center; }
 .marca .logo { font-family: var(--serif); font-size: 34px; letter-spacing: 0.04em; color: var(--floresta); }
 .marca .logo-img { width: 190px; height: auto; display: inline-block; }
-.marca .lema { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dourado); margin-top: 4px; }
+.marca .lema { padding-left: 34px; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dourado); margin-top: 4px; }
 
 /* cartoes */
 .card { background: var(--card); border: 1px solid var(--borda); border-radius: 20px; padding: 18px 18px 20px; margin-top: 16px; }
