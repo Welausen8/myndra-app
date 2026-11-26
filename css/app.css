@@ -93,3 +93,16 @@ input:focus { outline: 2px solid var(--musgo); outline-offset: 1px; }
 
 .carregando { display: grid; place-items: center; min-height: 100dvh; color: var(--texto-2); font-family: var(--serif); font-size: 22px; }
 .sair { background: none; border: 0; color: var(--texto-2); font-size: 13px; text-decoration: underline; margin-top: 26px; width: 100%; }
+
+/* escolha do Flow */
+.focos { display: grid; gap: 12px; margin-top: 18px; }
+.foco { text-align: left; width: 100%; background: var(--card); border: 1px solid var(--borda); border-radius: 20px; padding: 16px 18px; display: grid; gap: 6px; color: var(--texto); }
+.foco-nome { font-family: var(--serif); font-size: 24px; font-weight: 600; color: var(--floresta); line-height: 1.1; }
+.foco-sem { font-size: 13px; color: var(--texto-2); line-height: 1.45; }
+.foco-prioridade { border-color: var(--musgo); background: var(--tint); }
+.foco-travado { opacity: .6; cursor: default; }
+.tag { justify-self: start; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: var(--floresta); background: var(--creme); border: 1px solid var(--dourado); border-radius: 999px; padding: 3px 9px; }
+.tag-cinza { border-color: var(--borda); color: var(--texto-2); }
+.folha { position: fixed; inset: 0; background: rgba(43, 42, 34, .45); display: grid; align-items: end; z-index: 10; }
+.folha[hidden] { display: none; }
+.folha-caixa { background: var(--card); border-radius: 24px 24px 0 0; padding: 24px 22px calc(26px + env(safe-area-inset-bottom)); max-width: 480px; width: 100%; margin: 0 auto; }

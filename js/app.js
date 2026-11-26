@@ -197,6 +197,93 @@
     return out;
   }
 
+  /* ---------- Escolha do Flow gratuito ---------- */
+  // Palavras-tema das 6 primeiras semanas de cada foco (mesmo conteudo dos Rituals).
+  var FOCOS = [
+    { id: 1, nome: "Fundamento Interno", semanas: ["Presença", "Coerência", "Padrão", "Gentileza", "Nomeação", "Pausa"] },
+    { id: 2, nome: "Mente Organizada", semanas: ["Prioridade", "Conclusão", "Decisão", "Ordem", "Sistema", "Revisão"] },
+    { id: 3, nome: "Corpo e Energia", semanas: ["Presença", "Prazer", "Descanso", "Prevenção", "Nutrientes", "Atenção"] },
+    { id: 4, nome: "Conexão Ampliada", semanas: ["Silêncio", "Intuição", "Sentido", "Prática", "Cotidiano", "Legado"] },
+    { id: 5, nome: "Expressão e Realização", semanas: ["Presença", "Coragem", "Talento", "Visibilidade", "Alinhamento", "Origem"] },
+    { id: 6, nome: "Afetos Conscientes", semanas: ["Origem", "Papel", "Verdade", "Liberdade", "Integração", "Apoio"] }
+  ];
+
+  async function telaEscolherFlow(user) {
+    telaCarregando();
+    var rp = await sb.from("perfis").select("prioridade_1,prioridade_2").eq("id", user.id).maybeSingle();
+    var p1 = rp.data ? rp.data.prioridade_1 : null;
+    var p2 = rp.data ? rp.data.prioridade_2 : null;
+    var temMapa = p1 != null;
+
+    function cartao(f) {
+      var prioridade = temMapa && (f.id === p1 || f.id === p2);
+      var travado = temMapa && !prioridade;
+      return (
+        '<button type="button" class="foco' + (prioridade ? " foco-prioridade" : "") + (travado ? " foco-travado" : "") + '" data-id="' + f.id + '"' + (travado ? " disabled" : "") + ">" +
+        (prioridade ? '<span class="tag">Prioridade do seu mapa</span>' : "") +
+        (travado ? '<span class="tag tag-cinza">Faz parte do Myndra365</span>' : "") +
+        '<span class="foco-nome">' + esc(f.nome) + "</span>" +
+        '<span class="foco-sem">' + esc(f.semanas.join(" · ")) + "</span>" +
+        "</button>"
+      );
+    }
+
+    var ordenados = FOCOS.slice();
+    if (temMapa) {
+      ordenados.sort(function (a, b) {
+        var pa = (a.id === p1 || a.id === p2) ? 0 : 1;
+        var pb = (b.id === p1 || b.id === p2) ? 0 : 1;
+        return pa - pb || a.id - b.id;
+      });
+    }
+
+    app.innerHTML =
+      '<main class="tela">' + cabecalhoMarca() +
+      '<h1 class="saudacao" style="font-size:28px">Escolha o foco das suas 6 primeiras semanas.</h1>' +
+      '<p class="suave saudacao-sub">É a sua escolha gratuita, com acesso a tudo: Ritual, Flow e Life Body. Você escolhe uma vez, e depois acompanhamos o seu movimento, uma semana de cada vez.</p>' +
+      '<div class="focos">' + ordenados.map(cartao).join("") + "</div>" +
+      '<p id="msg" class="msg" role="status"></p>' +
+      '<a class="sair" href="#/inicio" style="display:block;text-align:center">Voltar</a>' +
+      '</main>' + abas("inicio") +
+      '<div id="confirma" class="folha" hidden></div>';
+
+    app.querySelectorAll(".foco:not([disabled])").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var f = FOCOS.filter(function (x) { return x.id === Number(b.dataset.id); })[0];
+        var folha = document.getElementById("confirma");
+        folha.innerHTML =
+          '<div class="folha-caixa" role="dialog" aria-modal="true">' +
+          '<div class="rotulo">Sua escolha</div>' +
+          "<h2>" + esc(f.nome) + "</h2>" +
+          '<p class="suave" style="margin-top:8px">Você começa hoje as suas 6 primeiras semanas neste foco. Essa escolha gratuita é única, então vale respirar antes de confirmar.</p>' +
+          '<button class="btn" id="ok" type="button">Começar este Flow</button>' +
+          '<button class="btn btn-sec" id="volta" type="button">Voltar</button>' +
+          '<p id="msg2" class="msg" role="status"></p></div>';
+        folha.hidden = false;
+        document.getElementById("volta").addEventListener("click", function () { folha.hidden = true; });
+        document.getElementById("ok").addEventListener("click", async function () {
+          var ok = document.getElementById("ok");
+          var m = document.getElementById("msg2");
+          ok.disabled = true;
+          m.className = "msg";
+          m.textContent = "Preparando suas semanas...";
+          var r = await sb.rpc("escolher_flow_gratuito", { p_macrofase: f.id });
+          if (r.error) {
+            ok.disabled = false;
+            m.className = "msg erro";
+            m.textContent = /já foi escolhido/i.test(r.error.message || "")
+              ? "O seu Flow gratuito já foi escolhido. Vou te levar ao Início."
+              : "Não consegui concluir agora. Tente de novo em instantes.";
+            if (/já foi escolhido/i.test(r.error.message || "")) setTimeout(function () { location.hash = "#/inicio"; telaInicio(user); }, 1500);
+            return;
+          }
+          location.hash = "#/inicio";
+          telaInicio(user);
+        });
+      });
+    });
+  }
+
   /* ---------- Boas-vindas: primeiro nome ---------- */
   function telaNome(user) {
     app.innerHTML =
@@ -236,7 +323,8 @@
     if (!d.acesso) {
       cartaoRitual =
         '<div class="card"><div class="rotulo">Life Ritual</div><h2>Seu Ritual começa quando você escolher seu Flow</h2>' +
-        '<p class="suave" style="margin-top:8px">Em breve você escolhe aqui o foco das suas 6 primeiras semanas.</p></div>';
+        '<p class="suave" style="margin-top:8px">Escolha o foco das suas 6 primeiras semanas, com acesso a tudo.</p>' +
+        '<a class="btn" href="#/escolher" style="display:block;text-align:center;text-decoration:none">Escolher meu Flow</a></div>';
     } else if (d.ritual) {
       cartaoRitual =
         '<div class="card"><div class="rotulo">Life Ritual · Semana ' + esc(d.semana) + "</div>" +
@@ -304,6 +392,7 @@
   async function desenhar() {
     if (!usuario) return telaLogin();
     var r = rota();
+    if (r === "escolher") return telaEscolherFlow(usuario);
     if (r === "flow") return telaEmBreve("flow", "Life Flow", "Aqui ficam as 7 tarefas da sua semana, uma por dia.");
     if (r === "body") return telaEmBreve("body", "Life Body", "Seu espaço para observar corpo, humor e ciclo. Só você vê.");
     if (r === "perfil") return telaEmBreve("perfil", "Perfil", "Seus dados e o que fica visível para as outras mulheres.");
