@@ -76,8 +76,8 @@
       '<button class="sair" type="button" id="trocar">' + (senha ? "Prefiro receber um código por e-mail" : "Entrar com e-mail e senha") + "</button>" +
       "</form>" +
       '<form id="f-codigo" novalidate hidden>' +
-      '<label for="codigo">Código de 6 números</label>' +
-      '<input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" style="letter-spacing:.4em;text-align:center;font-size:22px">' +
+      '<label for="codigo">Código recebido por e-mail</label>' +
+      '<input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Digite o código" style="letter-spacing:.3em;text-align:center;font-size:22px">' +
       '<button class="btn" type="submit">Entrar</button>' +
       '<p id="msg2" class="msg" role="status"></p>' +
       '<button class="sair" type="button" id="outro">Usar outro e-mail</button>' +
@@ -138,7 +138,7 @@
       emailEnviado = email;
       fLogin.hidden = true;
       fCodigo.hidden = false;
-      document.getElementById("intro").textContent = "Enviamos um código para " + email + ". Digite os 6 números abaixo. Vale olhar também o spam.";
+      document.getElementById("intro").textContent = "Enviamos um código para " + email + ". Digite o código abaixo. Vale olhar também o spam.";
       document.getElementById("codigo").focus();
     });
 
@@ -147,9 +147,9 @@
       var msg = document.getElementById("msg2");
       var botao = fCodigo.querySelector("button.btn");
       var codigo = document.getElementById("codigo").value.replace(/\D/g, "");
-      if (codigo.length !== 6) {
+      if (codigo.length < 6 || codigo.length > 10) {
         msg.className = "msg erro";
-        msg.textContent = "O código tem 6 números.";
+        msg.textContent = "Confira o código: só números, como no e-mail.";
         return;
       }
       botao.disabled = true;
