@@ -56,9 +56,13 @@
     try { return localStorage.getItem("myndra_usa_senha") === "1"; } catch (e) { return false; }
   }
 
-  function telaLogin(aviso, modo) {
+  function telaLogin(aviso, modo, nota) {
     modo = modo || (usaSenha() ? "senha" : "codigo");
     var senha = modo === "senha";
+    var info = nota || "";
+    try {
+      if (sessionStorage.getItem("myndra_saiu")) { sessionStorage.removeItem("myndra_saiu"); info = info || "Você saiu da conta. Até breve."; }
+    } catch (e) {}
     app.innerHTML =
       '<main class="centro">' +
       cabecalhoMarca() +
@@ -72,7 +76,8 @@
         ? '<label for="senha">Sua senha</label><input id="senha" type="password" autocomplete="current-password" required>'
         : "") +
       '<button class="btn" type="submit">' + (senha ? "Entrar" : "Enviar código de acesso") + "</button>" +
-      '<p id="msg" class="msg' + (aviso ? " erro" : "") + '" role="status">' + esc(aviso || "") + "</p>" +
+      '<p id="msg" class="msg' + (aviso ? " erro" : (info ? " ok" : "")) + '" role="status">' + esc(aviso || info) + "</p>" +
+      (senha ? '<button class="sair" type="button" id="esqueci">Esqueci minha senha</button>' : "") +
       '<button class="sair" type="button" id="trocar">' + (senha ? "Prefiro receber um código por e-mail" : "Entrar com e-mail e senha") + "</button>" +
       "</form>" +
       '<form id="f-codigo" novalidate hidden>' +
@@ -90,6 +95,11 @@
 
     document.getElementById("trocar").addEventListener("click", function () {
       telaLogin("", senha ? "codigo" : "senha");
+    });
+    var esq = document.getElementById("esqueci");
+    if (esq) esq.addEventListener("click", function () {
+      try { sessionStorage.setItem("myndra_recuperar", "1"); } catch (e) {}
+      telaLogin("", "codigo", "Sem problema. Digite seu e-mail e enviamos um código. Depois de entrar, você cria uma nova senha.");
     });
 
     fLogin.addEventListener("submit", async function (ev) {
@@ -114,7 +124,9 @@
         botao.disabled = false;
         if (rs.error) {
           msg.className = "msg erro";
-          msg.textContent = "E-mail ou senha não conferem. Se preferir, receba um código por e-mail.";
+          msg.textContent = (rs.error.status === 429)
+            ? "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo."
+            : "E-mail ou senha não conferem. Confira os dados, ou toque em \"Esqueci minha senha\".";
         }
         // se deu certo, onAuthStateChange abre o Inicio
         return;
@@ -169,107 +181,70 @@
   }
 
   /* ---------- Perfil (por enquanto: conta e senha) ---------- */
-  function telaPerfil(user) {
+  function telaPerfil(user, opts) {
+    var recuperar = !!(opts && opts.recuperar);
     app.innerHTML =
       '<main class="tela">' + cabecalhoMarca() +
+      (recuperar ? '<div class="card"><div class="rotulo">Você entrou</div><h2>Agora crie uma nova senha</h2><p class="suave" style="margin-top:6px">Assim, da próxima vez você entra com e-mail e senha.</p></div>' : "") +
       '<div class="card"><div class="rotulo">Sua conta</div><h2>' + esc(user.email || "") + "</h2>" +
       '<p class="suave" style="margin-top:6px">Mais opções de perfil e de privacidade chegam em breve.</p></div>' +
-      '<div class="card"><div class="rotulo">Senha</div><h2>Entrar sem pedir código</h2>' +
-      '<p class="suave" style="margin-top:6px">Crie uma senha e o seu celular pode guardá-la. Você continua podendo entrar por código, se preferir.</p>' +
-      '<form id="f-senha" novalidate>' +
-      '<input type="text" autocomplete="username" value="' + esc(user.email || "") + '" hidden>' +
-      '<label for="nova">Nova senha (mínimo 8 caracteres)</label>' +
-      '<input id="nova" type="password" autocomplete="new-password" minlength="8" required>' +
-      '<button class="btn" type="submit">Salvar senha</button>' +
-      '<p id="msg" class="msg" role="status"></p></form></div>' +
+      '<div class="card" id="cartao-senha"></div>' +
       '<button class="sair" id="sair">Sair da conta</button></main>' + abas("perfil");
     document.getElementById("sair").addEventListener("click", sair);
-    document.getElementById("f-senha").addEventListener("submit", async function (ev) {
-      ev.preventDefault();
-      var msg = document.getElementById("msg");
-      var botao = ev.target.querySelector("button.btn");
-      var pw = document.getElementById("nova").value;
-      if (pw.length < 8) { msg.className = "msg erro"; msg.textContent = "Use pelo menos 8 caracteres."; return; }
-      botao.disabled = true;
-      msg.className = "msg";
-      msg.textContent = "Salvando...";
-      var r = await sb.auth.updateUser({ password: pw });
-      botao.disabled = false;
-      if (r.error) {
-        msg.className = "msg erro";
-        msg.textContent = /different|same/i.test(r.error.message || "")
-          ? "Essa já é a sua senha atual."
-          : "Não consegui salvar agora. Tente uma senha diferente ou de novo em instantes.";
-        return;
-      }
-      lembrarSenha(true);
-      document.getElementById("nova").value = "";
-      msg.className = "msg ok";
-      msg.textContent = "Senha salva. Da próxima vez, entre com e-mail e senha.";
-    });
-  }
 
-  function abas(atual) {
-    var itens = [
-      ["inicio", "Início", "◌"],
-      ["flow", "Life Flow", "∿"],
-      ["body", "Life Body", "◍"],
-      ["perfil", "Perfil", "○"]
-    ];
-    return (
-      '<nav class="abas" aria-label="Navegação">' +
-      itens.map(function (i) {
-        return '<a href="#/' + i[0] + '"' + (i[0] === atual ? ' aria-current="page"' : "") + '><span class="ic" aria-hidden="true">' + i[2] + "</span>" + i[1] + "</a>";
-      }).join("") +
-      "</nav>"
-    );
-  }
-
-  function telaEmBreve(aba, titulo, texto) {
-    app.innerHTML =
-      '<main class="tela">' + cabecalhoMarca() +
-      '<div class="card"><div class="rotulo">Em breve</div><h2>' + esc(titulo) + "</h2>" +
-      '<p class="suave" style="margin-top:8px">' + esc(texto) + "</p></div>" +
-      '<button class="sair" id="sair">Sair da conta</button></main>' + abas(aba);
-    document.getElementById("sair").addEventListener("click", sair);
-  }
-
-  /* ---------- dados ---------- */
-  async function carregarInicio(user) {
-    var out = { perfil: null, acesso: null, ritual: null, passo: null, diasComRegistro: 0, humor: null, semana: 1, diaDaSemana: 1 };
-
-    var rp = await sb.from("perfis").select("nome,visibilidade").eq("id", user.id).maybeSingle();
-    out.perfil = rp.data;
-
-    var ra = await sb.from("acessos_flow").select("macrofase_id,tipo,inicio_em").eq("status", "ativo").order("inicio_em", { ascending: true }).limit(1).maybeSingle();
-    out.acesso = ra.data;
-
-    var hoje = hojeISO();
-    var rh = await sb.from("corpo_registros").select("dia_nivel").eq("data", hoje).maybeSingle();
-    out.humor = rh.data ? rh.data.dia_nivel : null;
-
-    if (!out.acesso) return out;
-
-    var inicio = dataLocalISO(out.acesso.inicio_em);
-    var dias = Math.max(0, diasEntre(inicio, hoje));
-    out.semana = Math.floor(dias / 7) + 1;
-    out.diaDaSemana = (dias % 7) + 1;
-
-    // Ritual da semana: n-esima semana da macrofase
-    var rr = await sb.from("rituals_semanas")
-      .select("numero,palavra_tema,frase")
-      .eq("macrofase_id", out.acesso.macrofase_id)
-      .order("numero", { ascending: true })
-      .limit(out.semana);
-    if (rr.data && rr.data.length) out.ritual = rr.data[rr.data.length - 1];
-
-    if (out.ritual) {
-      var rt = await sb.from("flow_tarefas").select("titulo,tipo").eq("semana_numero", out.ritual.numero).eq("dia", out.diaDaSemana).maybeSingle();
-      out.passo = rt.data;
-      var rd = await sb.rpc("dias_com_registro", { p_semana: out.ritual.numero });
-      out.diasComRegistro = rd.data || 0;
+    function cartaoCriada(mensagem) {
+      var c = document.getElementById("cartao-senha");
+      c.innerHTML =
+        '<div class="rotulo">Senha</div><h2>Senha criada</h2>' +
+        '<p class="suave" style="margin-top:6px">Você já pode entrar com e-mail e senha neste aparelho. Se esquecer, é só pedir um código por e-mail.</p>' +
+        (mensagem ? '<p class="msg ok" role="status">' + esc(mensagem) + "</p>" : "") +
+        '<button class="btn btn-sec" type="button" id="trocar-senha">Trocar senha</button>';
+      document.getElementById("trocar-senha").addEventListener("click", function () { cartaoForm(false); });
     }
-    return out;
+
+    function cartaoForm(primeira) {
+      var c = document.getElementById("cartao-senha");
+      c.innerHTML =
+        '<div class="rotulo">Senha</div><h2>' + (primeira ? "Criar senha" : "Trocar senha") + "</h2>" +
+        '<p class="suave" style="margin-top:6px">Use pelo menos 8 caracteres. O seu celular pode guardar a senha para você. Você continua podendo entrar por código, se preferir.</p>' +
+        '<form id="f-senha" novalidate>' +
+        '<input type="text" autocomplete="username" value="' + esc(user.email || "") + '" hidden>' +
+        '<label for="nova">Nova senha</label>' +
+        '<input id="nova" type="password" autocomplete="new-password" minlength="8" required>' +
+        '<label for="repete">Repita a nova senha</label>' +
+        '<input id="repete" type="password" autocomplete="new-password" minlength="8" required>' +
+        '<button class="btn" type="submit">Salvar senha</button>' +
+        '<p id="msg" class="msg" role="status"></p></form>';
+      document.getElementById("f-senha").addEventListener("submit", async function (ev) {
+        ev.preventDefault();
+        var msg = document.getElementById("msg");
+        var botao = ev.target.querySelector("button.btn");
+        var pw = document.getElementById("nova").value;
+        var pw2 = document.getElementById("repete").value;
+        if (pw.length < 8) { msg.className = "msg erro"; msg.textContent = "Use pelo menos 8 caracteres."; return; }
+        if (pw !== pw2) { msg.className = "msg erro"; msg.textContent = "As duas senhas não são iguais. Digite de novo."; return; }
+        if (pw.toLowerCase() === (user.email || "").toLowerCase()) { msg.className = "msg erro"; msg.textContent = "A senha não pode ser igual ao e-mail."; return; }
+        botao.disabled = true;
+        msg.className = "msg";
+        msg.textContent = "Salvando...";
+        var r = await sb.auth.updateUser({ password: pw });
+        botao.disabled = false;
+        if (r.error) {
+          msg.className = "msg erro";
+          var t = r.error.message || "";
+          msg.textContent = /different|same/i.test(t)
+            ? "Essa já é a sua senha atual. Escolha uma diferente."
+            : (/weak|short|least|characters/i.test(t)
+              ? "Essa senha é fraca demais. Use 8 ou mais caracteres, misturando letras e números."
+              : "Não consegui salvar agora. Tente de novo em instantes.");
+          return;
+        }
+        lembrarSenha(true);
+        cartaoCriada("Senha salva com sucesso. Da próxima vez, entre com e-mail e senha.");
+      });
+    }
+
+    if (usaSenha() && !recuperar) cartaoCriada(""); else cartaoForm(true);
   }
 
   /* ---------- Escolha do Flow gratuito ---------- */
@@ -385,6 +360,16 @@
     });
   }
 
+  function convidarSenha() {
+    var dispensado = false;
+    try { dispensado = localStorage.getItem("myndra_convite_senha") === "0"; } catch (e) {}
+    if (usaSenha() || dispensado) return "";
+    return '<div class="card"><div class="rotulo">Entre mais rápido</div><h2>Crie uma senha</h2>' +
+      '<p class="suave" style="margin-top:6px">Assim você não precisa pedir um código toda vez.</p>' +
+      '<a class="btn" href="#/perfil" style="display:block;text-align:center;text-decoration:none">Criar senha</a>' +
+      '<button class="sair" type="button" id="dispensa-senha" style="margin-top:12px">Agora não</button></div>';
+  }
+
   /* ---------- Inicio ---------- */
   async function telaInicio(user) {
     telaCarregando();
@@ -433,10 +418,16 @@
       '</div><div class="humor-leg"><span>Pesado</span><span>Leve</span></div>' +
       '<p id="humor-ok" class="humor-ok" role="status"></p></div>' +
       cartaoRitual + cartaoPasso +
+      convidarSenha() +
       '<p class="bordao">Todas estamos em movimento, cada uma na sua semana.</p>' +
       '<button class="sair" id="sair">Sair da conta</button></main>' + abas("inicio");
 
     document.getElementById("sair").addEventListener("click", sair);
+    var dsp = document.getElementById("dispensa-senha");
+    if (dsp) dsp.addEventListener("click", function () {
+      try { localStorage.setItem("myndra_convite_senha", "0"); } catch (e) {}
+      dsp.closest(".card").remove();
+    });
 
     app.querySelectorAll(".humor button").forEach(function (b) {
       b.addEventListener("click", async function () {
@@ -457,6 +448,7 @@
   var usuario = null;
 
   async function sair() {
+    try { sessionStorage.setItem("myndra_saiu", "1"); } catch (e) {}
     await sb.auth.signOut();
   }
 
@@ -466,6 +458,9 @@
 
   async function desenhar() {
     if (!usuario) return telaLogin();
+    var recuperando = false;
+    try { recuperando = sessionStorage.getItem("myndra_recuperar") === "1"; if (recuperando) sessionStorage.removeItem("myndra_recuperar"); } catch (e) {}
+    if (recuperando) { location.hash = "#/perfil"; return telaPerfil(usuario, { recuperar: true }); }
     var r = rota();
     if (r === "escolher") return telaEscolherFlow(usuario);
     if (r === "flow") return telaEmBreve("flow", "Life Flow", "Aqui ficam as 7 tarefas da sua semana, uma por dia.");
