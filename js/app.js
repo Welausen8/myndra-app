@@ -295,7 +295,7 @@
 
     // Ritual da semana: n-esima semana da macrofase
     var rr = await sb.from("rituals_semanas")
-      .select("numero,palavra_tema,frase")
+      .select("numero,microfase,palavra_tema,frase")
       .eq("macrofase_id", out.acesso.macrofase_id)
       .order("numero", { ascending: true })
       .limit(out.semana);
@@ -308,6 +308,51 @@
       out.diasComRegistro = rd.data || 0;
     }
     return out;
+  }
+
+  /* ---------- Ritual da semana ---------- */
+  function linhasRotuladas(txt) {
+    return String(txt || "").split("\n").filter(function (l) { return l.trim(); }).map(function (l) {
+      var i = l.indexOf(":");
+      if (i > 0 && i < 28) return '<p class="lin"><strong>' + esc(l.slice(0, i)) + "</strong> " + esc(l.slice(i + 1).trim()) + "</p>";
+      return '<p class="lin">' + esc(l) + "</p>";
+    }).join("");
+  }
+
+  async function telaRitual(user) {
+    telaCarregando();
+    var ra = await sb.from("acessos_flow").select("macrofase_id,inicio_em").eq("status", "ativo").order("inicio_em", { ascending: true }).limit(1).maybeSingle();
+    if (!ra.data) { location.hash = "#/escolher"; return; }
+    var dias = Math.max(0, diasEntre(dataLocalISO(ra.data.inicio_em), hojeISO()));
+    var semana = Math.floor(dias / 7) + 1;
+    var rr = await sb.from("rituals_semanas").select("*").eq("macrofase_id", ra.data.macrofase_id).order("numero", { ascending: true }).limit(semana);
+    var r = rr.data && rr.data.length ? rr.data[rr.data.length - 1] : null;
+    if (!r) { location.hash = "#/inicio"; return; }
+
+    function secao(titulo, corpo, aberta) {
+      if (!corpo) return "";
+      return '<details class="secao"' + (aberta ? " open" : "") + "><summary>" + esc(titulo) + "</summary><div class=\"corpo\">" + corpo + "</div></details>";
+    }
+    var move = r.move_titulo || r.move_texto
+      ? (r.move_titulo ? '<h3 class="move-t">' + esc(r.move_titulo) + "</h3>" : "") + (r.move_texto ? '<p class="lin">' + esc(r.move_texto) + "</p>" : "")
+      : "";
+
+    app.innerHTML =
+      '<main class="tela"><a class="voltar" href="#/inicio">‹ Início</a>' +
+      '<div class="card"><div class="rotulo">Life Ritual · Semana ' + esc(semana) + "</div>" +
+      (r.microfase ? '<div class="ritual-fase">' + esc(r.microfase) + "</div>" : "") +
+      '<div class="ritual-tema">' + esc(r.palavra_tema) + "</div>" +
+      '<p class="ritual-frase">' + esc(r.frase) + "</p>" +
+      (r.editorial_curto ? '<p class="suave" style="margin-top:14px">' + esc(r.editorial_curto) + "</p>" : "") + "</div>" +
+      secao("Por que importa", r.por_que_importa ? '<p class="lin">' + esc(r.por_que_importa) + "</p>" : "", true) +
+      secao("O Move da semana", move, true) +
+      secao("Reflexão", linhasRotuladas(r.reflexao), false) +
+      secao("Plano da semana", linhasRotuladas(r.plano), false) +
+      secao("Métrica", r.metrica ? '<p class="lin">' + esc(r.metrica) + "</p>" : "", false) +
+      secao("Curadoria", linhasRotuladas(r.curadoria), false) +
+      (r.encerramento ? '<p class="encerra">' + esc(r.encerramento) + "</p>" : "") +
+      "</main>" + abas("inicio");
+    window.scrollTo(0, 0);
   }
 
   /* ---------- Escolha do Flow gratuito ---------- */
@@ -440,7 +485,7 @@
     var primeiroNome = d.perfil && d.perfil.nome ? d.perfil.nome.split(" ")[0] : "";
     if (!primeiroNome) { return telaNome(user); }
 
-    var humores = [["1", "😔"], ["2", "😕"], ["3", "😐"], ["4", "🙂"], ["5", "😊"]];
+    var humores = [["1", "😔", "Esgotada"], ["2", "😕", "Cansada"], ["3", "😐", "Em paz"], ["4", "🙂", "Bem"], ["5", "😊", "Inteira"]];
 
     var cartaoRitual = "";
     if (!d.acesso) {
@@ -451,8 +496,10 @@
     } else if (d.ritual) {
       cartaoRitual =
         '<div class="card"><div class="rotulo">Life Ritual · Semana ' + esc(d.semana) + "</div>" +
+        (d.ritual.microfase ? '<div class="ritual-fase">' + esc(d.ritual.microfase) + "</div>" : "") +
         '<div class="ritual-tema">' + esc(d.ritual.palavra_tema) + "</div>" +
-        '<p class="ritual-frase">' + esc(d.ritual.frase) + "</p></div>";
+        '<p class="ritual-frase">' + esc(d.ritual.frase) + "</p>" +
+        '<a class="btn" href="#/ritual" style="display:block;text-align:center;text-decoration:none">Abrir o Ritual desta semana</a></div>';
     }
 
     var cartaoPasso = "";
@@ -472,15 +519,15 @@
     app.innerHTML =
       '<main class="tela">' + cabecalhoMarca() +
       '<h1 class="saudacao">' + esc(saudacaoDoHorario()) + (primeiroNome ? ", " + esc(primeiroNome) : "") + ".</h1>" +
-      '<p class="suave saudacao-sub">Observe como você chegou hoje.</p>' +
-      '<div class="card"><div class="rotulo">Como você chegou</div>' +
-      '<div class="humor" role="group" aria-label="Como você chegou hoje">' +
-      humores.map(function (h) {
-        return '<button type="button" data-n="' + h[0] + '" aria-pressed="' + (String(d.humor) === h[0]) + '" aria-label="Nível ' + h[0] + ' de 5">' + h[1] + "</button>";
-      }).join("") +
-      '</div><div class="humor-leg"><span>Pesado</span><span>Leve</span></div>' +
-      '<p id="humor-ok" class="humor-ok" role="status"></p></div>' +
+      '' +
       cartaoRitual + cartaoPasso +
+      '<div class="card"><div class="rotulo">Como você está chegando hoje</div>' +
+      '<p class="suave">Observe e escolha o que mais combina.</p>' +
+      '<div class="humor" role="group" aria-label="Como você está chegando hoje">' +
+      humores.map(function (h) {
+        return '<button type="button" data-n="' + h[0] + '" aria-pressed="' + (String(d.humor) === h[0]) + '" aria-label="' + h[2] + '"><span class="em">' + h[1] + '</span><span class="hl">' + h[2] + "</span></button>";
+      }).join("") +
+      '</div><p id="humor-ok" class="humor-ok" role="status"></p></div>' +
       convidarSenha() +
       '<p class="bordao">Todas estamos em movimento, cada uma na sua semana.</p>' +
       '<button class="sair" id="sair">Sair da conta</button></main>' + abas("inicio");
@@ -526,6 +573,7 @@
     if (recuperando) { location.hash = "#/perfil"; return telaPerfil(usuario, { recuperar: true }); }
     var r = rota();
     if (r === "escolher") return telaEscolherFlow(usuario);
+    if (r === "ritual") return telaRitual(usuario);
     if (r === "flow") return telaEmBreve("flow", "Life Flow", "Aqui ficam as 7 tarefas da sua semana, uma por dia.");
     if (r === "body") return telaEmBreve("body", "Life Body", "Seu espaço para observar corpo, humor e ciclo. Só você vê.");
     if (r === "perfil") return telaPerfil(usuario);

@@ -43,11 +43,13 @@ button { font: inherit; cursor: pointer; }
 /* humor */
 .humor { display: flex; gap: 8px; margin-top: 14px; }
 .humor button {
-  flex: 1; aspect-ratio: 1 / 1; border-radius: 16px; border: 1px solid var(--borda);
-  background: var(--creme); font-size: 22px; transition: transform .12s, background .12s;
+  flex: 1; border-radius: 16px; border: 1px solid var(--borda); padding: 10px 2px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--creme); transition: transform .12s, background .12s;
 }
+.humor .em { font-size: 24px; line-height: 1; }
+.humor .hl { font-size: 10.5px; color: var(--texto-2); line-height: 1.1; }
 .humor button[aria-pressed="true"] { background: var(--tint); border-color: var(--musgo); transform: scale(1.04); }
-.humor-leg { display: flex; justify-content: space-between; font-size: 11px; color: var(--texto-2); margin-top: 6px; padding: 0 4px; }
 .humor-ok { margin-top: 10px; font-size: 13px; color: var(--musgo); }
 .humor-ok:empty { display: none; }
 
@@ -106,3 +108,17 @@ input:focus { outline: 2px solid var(--musgo); outline-offset: 1px; }
 .folha { position: fixed; inset: 0; background: rgba(43, 42, 34, .45); display: grid; align-items: end; z-index: 10; }
 .folha[hidden] { display: none; }
 .folha-caixa { background: var(--card); border-radius: 24px 24px 0 0; padding: 24px 22px calc(26px + env(safe-area-inset-bottom)); max-width: 480px; width: 100%; margin: 0 auto; }
+
+/* Ritual da semana */
+.ritual-fase { font-size: 13px; color: var(--dourado); letter-spacing: .04em; margin-bottom: 4px; }
+.voltar { display: inline-block; margin-top: 18px; color: var(--musgo); font-size: 14px; text-decoration: none; }
+.secao { background: var(--card); border: 1px solid var(--borda); border-radius: 20px; margin-top: 12px; }
+.secao summary { list-style: none; cursor: pointer; padding: 16px 18px; font-family: var(--serif); font-size: 21px; color: var(--floresta); display: flex; justify-content: space-between; align-items: center; }
+.secao summary::-webkit-details-marker { display: none; }
+.secao summary::after { content: "+"; color: var(--musgo); font-family: var(--sans, inherit); font-size: 20px; }
+.secao[open] summary::after { content: "–"; }
+.secao .corpo { padding: 0 18px 18px; }
+.secao .lin { font-size: 15px; line-height: 1.55; color: var(--texto); margin-top: 8px; }
+.secao .lin strong { color: var(--floresta); font-weight: 600; }
+.move-t { font-family: var(--serif); font-size: 19px; color: var(--floresta); font-weight: 600; }
+.encerra { text-align: center; font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--floresta); margin: 26px 12px 8px; }
